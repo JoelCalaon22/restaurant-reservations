@@ -1,21 +1,24 @@
-import express from "express"; 
+import express from "express";
 import { branches } from "./data/branches.js";
 
 const app = express();
 app.use(express.json());
 
 app.get("/health", (_req, res) => {
-    res.json({ status: "ok", sevice: "restaurant-reservations"});
+  res.json({ status: "ok", service: "restaurant-reservations" });
 });
 
-const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-    console.log('Server running on http://localhost:$(PORT)');
-});
+app.get("/branches", (req, res) => {
+  const { city } = req.query;
 
-app.get("/branches", (_req, res) => {
-  res.json(branches);
+  if (!city) return res.json(branches);
+
+  const filtered = branches.filter(
+    b => b.city.toLowerCase() === city.toLowerCase()
+  );
+
+  res.json(filtered);
 });
 
 app.get("/branches/:id", (req, res) => {
@@ -26,4 +29,9 @@ app.get("/branches/:id", (req, res) => {
   }
 
   res.json(branch);
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
 });
