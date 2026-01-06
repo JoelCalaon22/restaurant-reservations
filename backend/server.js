@@ -12,13 +12,15 @@ app.get("/health", (_req, res) => {
 app.get("/branches", (req, res) => {
   const { city } = req.query;
 
-  if (!city) return res.json(branches);
+  let result = branches;
 
-  const filtered = branches.filter(
-    b => b.city.toLowerCase() === city.toLowerCase()
-  );
+  if (city){
+    const cityLower = city.toLowerCase();
+    result = branches.filter(b => b.city.toLowerCase() === cityLower);
 
-  res.json(filtered);
+  } 
+  
+  res.json(result);
 });
 
 app.get("/branches/:id", (req, res) => {
@@ -34,4 +36,5 @@ app.get("/branches/:id", (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+
 });
