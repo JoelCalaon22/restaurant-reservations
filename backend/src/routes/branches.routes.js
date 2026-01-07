@@ -31,6 +31,24 @@ router.get("/:id/tables", (req, res) => {
     res.json(branchTables);
 });
 
+router.get("/:id/summary", (req, res) => {
+    const branchId = req.params.id;
+
+    const branch = branches.find(b => b.id === branchId);
+    if (!branch) {
+        return res.status(404).json({ messsage: "branch not found" });
+    }
+
+    const branchTables = tables.filter(t => t.branchId === branchId);
+    const totalSeats = branchTables.reduce((sum , t) => sum + t.seats, 0);
+
+    res.json({
+        ...branch,
+        tables: branchTables.lenght,
+        totalSeats,
+    });
+});
+
 router.get("/:id", (req, res) => {
     const branch = branches.find(b => b.id === req.params.id);
     
