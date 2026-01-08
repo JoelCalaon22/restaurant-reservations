@@ -1,8 +1,10 @@
-Restaurant Reservations 
+# Restaurant Reservations 
 
-This project is a restaurant reservation management system built step by step.
+Restaurant Reservations is a backend system for managing table reservations in multi-branch bars and restaurants.
 
-The goal is to model a real-world scenario for multi-branch bars and restaurants, including branches, tables and reservation logic.
+The project is built step by step to model a real-world scenario, focusing on reservation logic, table allocation and time-based availability.
+
+It is designed as a core system that can later be extended with a database and a frontend application.
 
 ## Features
 
@@ -13,6 +15,21 @@ The goal is to model a real-world scenario for multi-branch bars and restaurants
 - List tables per branch
 - Branch summary (tables and total seats)
 - Table suggestion logic for group size optimization
+- Automatic table allocation
+- Overlap detection for reservations
+- Waste calculation (unused seats)
+
+## Reservation Logic
+
+When creating a reservation, the system:
+
+- Validates input data
+- Uses a fixed reservation duration (30 minutes)
+- Finds available tables for the requested time slot
+- Calculates the optimal combination of tables based on:
+  - Minimum number of tables
+  - Minimum number of unused seats (waste)
+- Prevents overlapping reservations on the same tables
 
 ## Tech Stack
 
@@ -28,7 +45,7 @@ The goal is to model a real-world scenario for multi-branch bars and restaurants
 
 2. Start server
    node backend/src/server.js
-The API will be available locally at:
+The server will run locally at:
 http://localhost:3000
 
 ## Available Endpoints
@@ -69,15 +86,32 @@ Example response:
 }
 ```
 
+### Reservations
+- POST /branches/:id/reservations
+
+Creates a reservation if tables are available for the requested time slot.
+
+Request body example:
+
+```
+{
+"name": "Joel",
+"people": 7,
+"datetime": "2026-01-07T21:00"
+}
+```
+
+
 ## Project Status
 
 This project is under active development.
 
 Upcoming steps: 
-- Reservation creation with time slots (30 minutes)
-- Table availability and blocking 
+- Reservation listing per branch
+- Date-based reservation filtering
 - Persistence layer (database)
 - Frontend integration
+- Authentication and roles
 
 ## License
 
