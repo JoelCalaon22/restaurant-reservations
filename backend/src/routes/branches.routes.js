@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { branches } from "../data/branches.js";
 import { tables } from "../data/tables.js";
+import { reservations } from "../data/reservations.js";
+import { addMinutes, overlaps, parseISODatetime } from "../utils/time.js";
+
 
 const router = Router();
 
@@ -44,13 +47,13 @@ router.get("/:id/summary", (req, res) => {
 
     res.json({
         ...branch,
-        tables: branchTables.lenght,
+        tables: branchTables.length,
         totalSeats,
     });
 });
 
 router.get("/:id/table-suggestions", (req, res) => {
-    const branchId = req.params = req.params.id;
+    const branchId = req.params.id;
     const people = Number(req.query.people);
 
     if (!Number.isInteger(people) || people <= 0) {
@@ -87,7 +90,7 @@ router.get("/:id/table-suggestions", (req, res) => {
     function evaluate( candidateTables ) {
         const totalSeats = candidateTables.reduce((sum, t) => sum + t.seats, 0);
         const waste = totalSeats - people;
-        return { totalSeats, waste, tablesCount: candidateTables.lenght };
+        return { totalSeats, waste, tablesCount: candidateTables.length };
     }  
 
     function isBetter(a, b) {
@@ -105,7 +108,7 @@ router.get("/:id/table-suggestions", (req, res) => {
             return;
         }
 
-        if (best && current.lenght >= best.score.tablesCount) return;
+        if (best && current.length >= best.score.tablesCount) return;
 
         for (let i = startIndex; i < branchTables.length; i++) {
         const t = branchTables[i];
@@ -134,6 +137,115 @@ router.get("/:id/table-suggestions", (req, res) => {
     });
 });
 
+router.post("/:id/reservations", (req, res) => {
+    const branchId = req.params.id;
+    const { name, people, datetime } = req.body;
+
+    if (!name || typeof name !== "string") {
+        return res.status(404).json({message: "field 'name' is required"});
+    }
+
+    const peopleNum = Number(people);
+    if(!Number.isInteger(peopleNum) || peopleNum <= 0){
+        return res.status(400).json({ message: "field 'people' must be a positive integer"});
+    }
+
+    const start = parseISODatetime(datetime);
+
+    if(!start) {
+        return res.status(400).json({
+            message: "field 'datetime' must be a valid ISO datetime string",
+            example: "2026-01-07T21:00",
+        });
+    }
+
+    const branch = branches.find (b => b.id === branchId);
+    if(!branch) return res.status(404).json({message: "branch not found"});
+
+    const durationMinutes = 30;
+    const end = addMinutes(start, durationMinutes);
+
+    const branchTables = tables
+        .filter(t => t.branchId === branchId)
+        .sort((a, b) => b.seats - a.seats);
+    
+    if (branchTables.length === 0) {
+        return res.status(404).json({message: "no tables configured for this branch"});
+    }
+
+    const busyTableIds = new Set();
+
+    for (const r of reservations) {
+        if (r.branchId !== branchId) continue;
+
+        const rStart = new Date(r.start);
+        const rEnd = new Date(r.end);
+
+        if (overlaps(start, end, rStart, rEnd)) {
+            for (const tid of r.tableIds) busyTableIds.add(tid);
+        }
+    }
+
+    const availableTables = branchTables.filter(t => !busyTableIds.has(t.id));
+
+    let best = null;
+
+    function evaluate(candidateTables) {
+        const totalSeats = candidateTables.reduce((sum, t) => sum + t.seats, 0);
+        const waste = totalSeats - peopleNum;
+        return { totalSeats, waste, tablesCount: candidateTables.length };
+    }
+
+    function isBetter (a, b) {
+        if(!b) return true;
+        if (a.tablesCount !== b.tablesCount) return a.tablesCount < b.tablesCount;
+        return a.waste < b.waste;
+    }
+
+    function search(startIndex, current, currentSeats) {
+        if (currentSeats >= peopleNum) {
+            const score = evaluate(current);
+            if (isBetter(score, best?.score)) best = {tables: [...current], score};
+            return;
+        }
+        
+        if (best && current.length >= best.score.tablesCount) return;
+
+        for (let i = startIndex; i < availableTables.length; i++) {
+            const t = availableTables[i];
+            current.push(t);
+            search(i + 1, current, currentSeats + t.seats);
+            current.pop();
+        }
+    }
+
+    search(0, [], 0);
+
+    if (!best) {
+        return res.status(409).json({
+            message: "no available table combnination for this time slot",
+            people: peopleNum,
+            start: start.toISOString(),
+            end: end.toISOString(),
+        });
+    }
+
+    const newReservation = {
+        id: `res-${Date.now()}`,
+        branchId,
+        name,
+        people: peopleNum,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        tableIds: best.tables.map(t => t.id),
+        totalSeats: best.score.totalSeats,
+        waste: best.score.waste,
+    };
+
+    reservations.push(newReservation);
+
+    return res.status(201).json(newReservation);
+});
 
 router.get("/:id", (req, res) => {
     const branch = branches.find(b => b.id === req.params.id);
