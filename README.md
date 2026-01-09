@@ -88,8 +88,12 @@ Example response:
 
 ### Reservations
 - POST /branches/:id/reservations
+- GET /branches/:id/reservations
+- GET /branches/:id/reservations?date=YYYY-MM-DD
 
-Creates a reservation if tables are available for the requested time slot.
+Creates and lists reservations for a specific branch.
+
+When creating a reservation, tables are automatically assigned if available for the requested time slot.
 
 Request body example:
 
@@ -101,6 +105,7 @@ Request body example:
 }
 ```
 
+Note: the `date` filter matches the reservation `start` ISO string (UTC).
 
 ## Project Status
 
