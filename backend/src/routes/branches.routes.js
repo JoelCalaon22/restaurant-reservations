@@ -247,6 +247,28 @@ router.post("/:id/reservations", (req, res) => {
     return res.status(201).json(newReservation);
 });
 
+router.get("/:id/reservations", (req, res) => {
+    const branchId = req.params.id;
+    const { date } = req.query;
+
+    const branch = branches.find(b => b.id === branchId);
+    if (!branch) return res.status(404).json({ message: "branch not found"});
+
+    let result = reservations.filter(r => r.branchId === branchId);
+
+    if (date) {
+        result = result.filter (r => (r.start || "").startsWith(date));
+    }
+
+    result.sort((a, b) => new Date(a.start) - new Date(b.start));
+
+    return res.json({
+        branch: { id: branch.id, name: branch.name, city: branch.city },
+        count: result.length,
+        reservations: result,
+    });
+});
+
 router.get("/:id", (req, res) => {
     const branch = branches.find(b => b.id === req.params.id);
     
