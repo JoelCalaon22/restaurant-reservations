@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { branches } from "../data/branches.js";
 import { tables } from "../data/tables.js";
-import { reservations } from "../data/reservations.js";
-import { addMinutes, overlaps, parseISODatetime } from "../utils/time.js";
+import { addMinutes, parseISODatetime } from "../utils/time.js";
+import { prisma } from "../db/prisma.js";
 
 
 const router = Router();
@@ -137,7 +137,7 @@ router.get("/:id/table-suggestions", (req, res) => {
     });
 });
 
-router.post("/:id/reservations", (req, res) => {
+router.post("/:id/reservations", async (req, res) => {
     const branchId = req.params.id;
     const { name, people, datetime } = req.body;
 
@@ -173,16 +173,19 @@ router.post("/:id/reservations", (req, res) => {
         return res.status(404).json({message: "no tables configured for this branch"});
     }
 
+    const overlapping = await prisma.reservation.findMany({
+        where: {
+            branchId,
+            start: { lt: end },
+            end: { gt: start },
+        },
+        include: { tables: true },
+    });
+
     const busyTableIds = new Set();
-
-    for (const r of reservations) {
-        if (r.branchId !== branchId) continue;
-
-        const rStart = new Date(r.start);
-        const rEnd = new Date(r.end);
-
-        if (overlaps(start, end, rStart, rEnd)) {
-            for (const tid of r.tableIds) busyTableIds.add(tid);
+    for (const r of overlapping) {
+        for (const t of r.tables) {
+            busyTableIds.add(t.tableId);
         }
     }
 
@@ -230,44 +233,74 @@ router.post("/:id/reservations", (req, res) => {
         });
     }
 
-    const newReservation = {
-        id: `res-${Date.now()}`,
-        branchId,
-        name,
-        people: peopleNum,
-        start: start.toISOString(),
-        end: end.toISOString(),
-        tableIds: best.tables.map(t => t.id),
-        totalSeats: best.score.totalSeats,
-        waste: best.score.waste,
-    };
+    const created = await prisma.reservation.create({
+        data: {
+            branchId,
+            name,
+            people: peopleNum,
+            start, 
+            end,   
+            totalSeats: best.score.totalSeats,
+            waste: best.score.waste,
+            tables: {
+                create: best.tables.map(t => ({ tableId: t.id })),
+            },
+        },
+            include: { tables: true },
+    });
 
-    reservations.push(newReservation);
-
-    return res.status(201).json(newReservation);
-});
-
-router.get("/:id/reservations", (req, res) => {
-    const branchId = req.params.id;
-    const { date } = req.query;
-
-    const branch = branches.find(b => b.id === branchId);
-    if (!branch) return res.status(404).json({ message: "branch not found"});
-
-    let result = reservations.filter(r => r.branchId === branchId);
-
-    if (date) {
-        result = result.filter (r => (r.start || "").startsWith(date));
-    }
-
-    result.sort((a, b) => new Date(a.start) - new Date(b.start));
-
-    return res.json({
-        branch: { id: branch.id, name: branch.name, city: branch.city },
-        count: result.length,
-        reservations: result,
+    return res.status(201).json({
+        id: created.id,
+        branchId: created.branchId,
+        name: created.name,
+        people: created.people,
+        start: created.start,
+        end: created.end,
+        tableIds: created.tables.map(x => x.tableId),
+        totalSeats: created.totalSeats,
+        waste: created.waste,
     });
 });
+
+router.get("/:id/reservations", async (req, res) => {
+  const branchId = req.params.id;
+  const { date } = req.query; 
+
+  const branch = branches.find(b => b.id === branchId);
+  if (!branch) return res.status(404).json({ message: "branch not found" });
+
+  const where = { branchId };
+
+  if (date) {
+    const startDay = new Date(`${date}T00:00:00.000-03:00`);
+    const endDay = new Date(`${date}T23:59:59.999-03:00`);
+
+    where.start = { gte: startDay, lte: endDay };
+  }
+
+  const items = await prisma.reservation.findMany({
+    where,
+    orderBy: { start: "asc" },
+    include: { tables: true },
+  });
+
+  return res.json({
+    branch: { id: branch.id, name: branch.name, city: branch.city },
+    count: items.length,
+    reservations: items.map(r => ({
+      id: r.id,
+      branchId: r.branchId,
+      name: r.name,
+      people: r.people,
+      start: r.start,
+      end: r.end,
+      tableIds: r.tables.map(x => x.tableId),
+      totalSeats: r.totalSeats,
+      waste: r.waste,
+    })),
+  });
+});
+
 
 router.get("/:id", (req, res) => {
     const branch = branches.find(b => b.id === req.params.id);

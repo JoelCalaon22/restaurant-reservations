@@ -105,7 +105,7 @@ Request body example:
 }
 ```
 
-Note: the `date` filter matches the reservation `start` ISO string (UTC).
+Note: the `date` filter uses Argentina time (UTC-3).
 
 ## Project Status
 
