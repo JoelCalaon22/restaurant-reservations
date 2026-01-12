@@ -107,6 +107,10 @@ Request body example:
 
 Note: the `date` filter uses Argentina time (UTC-3).
 
+## Environment variables
+
+Create a `.env` file based on `.env.example` and fill your database credentials.
+
 ## Project Status
 
 This project is under active development.
