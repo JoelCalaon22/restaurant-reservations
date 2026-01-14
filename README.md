@@ -1,23 +1,29 @@
 # Restaurant Reservations 
 
-Restaurant Reservations is a backend system for managing table reservations in multi-branch bars and restaurants.
+A reservation management backend for multi-branch bars and restaurants.
 
-The project is built step by step to model a real-world scenario, focusing on reservation logic, table allocation and time-based availability.
-
-It is designed as a core system that can later be extended with a database and a frontend application.
+Built step by step to model real-world reservation logic: table allocation, time slots, and overlap detection.
+A React frontend (Vite) is being added to visualize branches, tables and reservations.
 
 ## Features
 
+### Backend 
 - Health check endpoint
 - Branch listing
 - Filter branches by city
 - Get branch by ID
 - List tables per branch
 - Branch summary (tables and total seats)
-- Table suggestion logic for group size optimization
-- Automatic table allocation
-- Overlap detection for reservations
-- Waste calculation (unused seats)
+- Table suggestions logic for group size optimization
+- Reservation creation with:
+  - Fixed duration (30 minutes)
+  - Automatic table allocation
+  - Overlap detection (prevents double-booking)
+  - Waste calculation (unused seats)
+
+### Frontend
+- React + Vite scaffold
+- Tailwind CSS setup
 
 ## Reservation Logic
 
@@ -33,22 +39,39 @@ When creating a reservation, the system:
 
 ## Tech Stack
 
+### Backend
 - Node.js
 - Express
 - JavaScript
-- In-memory data (temporary)
+- In-memory data (temporary; DB integration planned)
+
+### Frontend
+- React
+- Vite
+- Tailwind CSS
+
 
 ## Running Locally
 
-1. Install dependencies
-   npm install
+Backend
+```
+cd backend
+npm install
+node src/server.js
 
-2. Start server
-   node backend/src/server.js
 The server will run locally at:
 http://localhost:3000
 
-## Available Endpoints
+Frontend
+
+cd frontend
+npm install
+npm run dev
+
+Frontend runs at:
+http://localhost:5173
+```
+## API Endpoints
 
 ### Health
 - GET /health
@@ -119,7 +142,7 @@ Upcoming steps:
 - Reservation listing per branch
 - Date-based reservation filtering
 - Persistence layer (database)
-- Frontend integration
+- Frontend IU implementation
 - Authentication and roles
 
 ## License
