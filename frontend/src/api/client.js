@@ -8,3 +8,5 @@ export async function apiGet(path) {
   }
   return res.json();
 }
+
+export { BASE_URL };

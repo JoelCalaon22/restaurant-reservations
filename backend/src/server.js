@@ -4,7 +4,15 @@ import brnachesRoutes from "./routes/branches.routes.js";
 
 const app = express();
 
-app.use(cors());
+app.get("/", (_req, res) => {
+  res.send(
+    "Restaurant Reservations API. Try: GET /health, GET /branches"
+  );
+});
+ 
+app.use(cors({
+  origin: "http://localhost:5173"
+}));
 app.use(express.json());
 
 app.get("/health", (_req, res) => {
