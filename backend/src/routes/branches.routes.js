@@ -7,6 +7,31 @@ import { prisma } from "../db/prisma.js";
 
 const router = Router();
 
+function randomCode(len = 6) {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out;
+}
+
+async function generateUniqueReservationCode(branchId) {
+  const prefix = (branchId || "BR")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 6);
+
+  for (let i = 0; i < 30; i++) {
+    const code = `${prefix}-${randomCode(6)}`;
+    const exists = await prisma.reservation.findUnique({
+      where: { code },
+      select: { id: true },
+    });
+    if (!exists) return code;
+  }
+
+  throw new Error("Could not generate unique reservation code");
+}
+
 router.get("/", (req, res) => {
     const { city } = req.query;
 
@@ -142,7 +167,7 @@ router.post("/:id/reservations", async (req, res) => {
     const { name, people, datetime } = req.body;
 
     if (!name || typeof name !== "string") {
-        return res.status(404).json({message: "field 'name' is required"});
+        return res.status(400).json({message: "field 'name' is required"});
     }
 
     const peopleNum = Number(people);
@@ -176,6 +201,7 @@ router.post("/:id/reservations", async (req, res) => {
     const overlapping = await prisma.reservation.findMany({
         where: {
             branchId,
+            status: "CONFIRMED",
             start: { lt: end },
             end: { gt: start },
         },
@@ -233,8 +259,11 @@ router.post("/:id/reservations", async (req, res) => {
         });
     }
 
+    const code = await generateUniqueReservationCode(branchId);
+
     const created = await prisma.reservation.create({
         data: {
+            code,
             branchId,
             name,
             people: peopleNum,
@@ -250,6 +279,7 @@ router.post("/:id/reservations", async (req, res) => {
     });
 
     return res.status(201).json({
+        code: created.code,
         id: created.id,
         branchId: created.branchId,
         name: created.name,
@@ -269,7 +299,7 @@ router.get("/:id/reservations", async (req, res) => {
   const branch = branches.find(b => b.id === branchId);
   if (!branch) return res.status(404).json({ message: "branch not found" });
 
-  const where = { branchId };
+  const where = { branchId, status: "CONFIRMED" };
 
   if (date) {
     const startDay = new Date(`${date}T00:00:00.000-03:00`);
@@ -289,6 +319,7 @@ router.get("/:id/reservations", async (req, res) => {
     count: items.length,
     reservations: items.map(r => ({
       id: r.id,
+      code: r.code,
       branchId: r.branchId,
       name: r.name,
       people: r.people,
@@ -298,6 +329,52 @@ router.get("/:id/reservations", async (req, res) => {
       totalSeats: r.totalSeats,
       waste: r.waste,
     })),
+  });
+});
+
+router.patch("/:id/reservations/:reservationId/cancel", async (req, res) => {
+  const branchId = req.params.id;
+  const reservationId = req.params.reservationId;
+  const { reason } = req.body || {};
+
+  const reservation = await prisma.reservation.findUnique({
+    where: { id: reservationId },
+  });
+
+  if (!reservation || reservation.branchId !== branchId) {
+    return res.status(404).json({ message: "reservation not found" });
+  }
+
+  if (reservation.status === "CANCELLED") {
+    return res.json({
+      message: "Reservation already cancelled.",
+      reservationId,
+      status: reservation.status,
+    });
+  }
+
+  const updated = await prisma.reservation.update({
+    where: { id: reservationId },
+    data: {
+      status: "CANCELLED",
+      cancelledAt: new Date(),
+      cancelReason: typeof reason === "string" ? reason : null,
+    },
+    select: {
+      id: true,
+      code: true,
+      branchId: true,
+      name: true,
+      start: true,
+      status: true,
+      cancelledAt: true,
+      cancelReason: true,
+    },
+  });
+
+  return res.json({
+    message: `Reservation ${updated.code} cancelled successfully. Time slot is now available for other customers.`,
+    reservation: updated,
   });
 });
 

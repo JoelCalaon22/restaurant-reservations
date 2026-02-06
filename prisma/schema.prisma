@@ -7,18 +7,28 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Reservation {
-  id        String   @id @default(cuid())
-  branchId  String
-  name      String
-  people    Int
-  start     DateTime
-  end       DateTime
-  totalSeats Int
-  waste     Int
-  createdAt DateTime @default(now())
+enum ReservationStatus {
+  CONFIRMED
+  CANCELLED
+}
 
-  tables    ReservationTable[]
+model Reservation {
+  id          String            @id @default(cuid())
+  code        String            @unique
+  branchId    String
+  name        String
+  people      Int
+  start       DateTime
+  end         DateTime
+  totalSeats  Int
+  waste       Int
+  createdAt   DateTime          @default(now())
+
+  status       ReservationStatus @default(CONFIRMED)
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  tables      ReservationTable[]
 }
 
 model ReservationTable {
@@ -28,4 +38,30 @@ model ReservationTable {
   reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
 
   @@id([reservationId, tableId])
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  resetTokens  PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }

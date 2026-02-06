@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import brnachesRoutes from "./routes/branches.routes.js";
+import authRoutes from "./routes/auth.routes.js";
 
 const app = express();
 
@@ -20,6 +21,8 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/branches", brnachesRoutes)
+
+app.use("/auth", authRoutes)
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
